@@ -42,7 +42,7 @@ e.on('exit', function (str) {
   cli.responders.exit(str)
 })
 
-//! Delete later
+//! only for test
 e.on('test', function (str) {
   cli.responders.test(str)
 })
@@ -53,8 +53,11 @@ cli.output = ''
 
 // Help
 cli.responders.help = function (str) {
-  console.log(`
-  Commands:
+  const input = str.split(' ')
+  const command = input[1]
+  if (input[1] === undefined) {
+    console.log(`
+    Commands:
 
     help [command...]             Provides help for a given command.
     exit                          Exits application.
@@ -63,7 +66,35 @@ cli.responders.help = function (str) {
     transfer [target] [amount]    Transfers this amount to the logged in costumer to the target costumer
     withdraw [amount]             Withdraws this amount to the logged in costumer
     logout                        Logout the current costumer
-`)
+    `)
+  } else {
+    if (command === 'exit') {
+      console.log('write command exit to Exits application.')
+    }
+    if (command === 'logout') {
+      console.log('write logout to Logout the current costumer')
+    }
+    if (command === 'login') {
+      console.log(
+        'write login [username] [password] to Login as the costumer, create if not exist.'
+      )
+    }
+    if (command === 'deposit') {
+      console.log(
+        'write deposit [amount] to Deposits this amount to the logged in costumer'
+      )
+    }
+    if (command === 'withdraw') {
+      console.log(
+        'write withdraw [amount] to Withdraws this amount to the logged in costumer'
+      )
+    }
+    if (command === 'transfer') {
+      console.log(
+        'write transfer [target] [amount] to Transfers this amount to the logged in costumer to the target costumer'
+      )
+    }
+  }
   clearScreen()
 }
 
@@ -377,7 +408,7 @@ cli.responders.exit = function () {
   console.log('exit')
   process.exit(0)
 }
-//! Delete later
+//! only for test
 cli.responders.test = async function (str) {
   const input = str.split(' ')
   await prisma.user.delete({
