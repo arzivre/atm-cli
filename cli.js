@@ -145,6 +145,7 @@ cli.responders.deposit = async function (str) {
       const debtValue = userLoggedIn.debt[0].value
       //* if deposite more than enought to pay debt save the return
       if (amount - userLoggedIn.debt[0].value > 0) {
+        const oldDebt = userLoggedIn.debt[0].value
         // increase target balance
         await prisma.user.update({
           where: {
@@ -175,9 +176,10 @@ cli.responders.deposit = async function (str) {
 
         userLoggedIn = user
         console.log(
-          `Transferred $${amount} to ${target.name}, your balance is $${userLoggedIn.balance}`
+          `Transferred $${oldDebt} to ${target.name}, your balance is $${userLoggedIn.balance}`
         )
       } else {
+        //* if deposite not enought to pay debt
         // increase target balance
         await prisma.user.update({
           where: {
