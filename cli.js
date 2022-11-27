@@ -170,15 +170,9 @@ cli.responders.deposit = async function (str) {
           },
         })
         // delete targe creditor
-        const creditor = await prisma.creditor.findUnique({
-          where: {
-            debtor: userLoggedIn.name,
-          },
-        })
-        // delete targe creditor
         await prisma.creditor.delete({
           where: {
-            id: creditor.id,
+            debtor: userLoggedIn.name,
           },
         })
         // delete user debt
@@ -200,12 +194,6 @@ cli.responders.deposit = async function (str) {
           data: {
             balance:
               Number(target.balance) + Number(userLoggedIn.debt[0].value),
-          },
-        })
-
-        const creditor = await prisma.creditor.findUnique({
-          where: {
-            debtor: userLoggedIn.name,
           },
         })
 
@@ -287,7 +275,7 @@ cli.responders.withdraw = async function (str) {
 
 cli.responders.transfer = async function (str) {
   const input = str.split(' ')
-
+  const amount = Number(input[2])
   // Input Validation
   if (
     userLoggedIn.id === undefined ||
@@ -317,8 +305,8 @@ cli.responders.transfer = async function (str) {
       console.log('Trarget is not registered')
     } else {
       //** user balance is not enough will generate debt */
-      if (Math.sign(userLoggedIn.balance - Number(input[2])) === -1) {
-        const debtValue = Math.abs(userLoggedIn.balance - Number(input[2]))
+      if (Math.sign(userLoggedIn.balance - amount) === -1) {
+        const debtValue = Math.abs(userLoggedIn.balance - amount)
         // get target data
         // Decrease user balance and generate debt
         const updateUser = prisma.user.update({
@@ -345,7 +333,7 @@ cli.responders.transfer = async function (str) {
             id: target.id,
           },
           data: {
-            balance: userLoggedIn.balance + Number(input[2]),
+            balance: userLoggedIn.balance + amount,
             creditor: {
               create: {
                 isPaid: false,
@@ -373,7 +361,7 @@ cli.responders.transfer = async function (str) {
             id: userLoggedIn.id,
           },
           data: {
-            balance: userLoggedIn.balance - Number(input[2]),
+            balance: userLoggedIn.balance - amount,
           },
         })
 
@@ -383,14 +371,14 @@ cli.responders.transfer = async function (str) {
             id: target.id,
           },
           data: {
-            balance: userLoggedIn.balance + Number(input[2]),
+            balance: userLoggedIn.balance + amount,
           },
         })
 
         // if there is any fail transaction, will cancel all transaction
         await prisma.$transaction([updateUser, updateTarget])
         // update user balance
-        userLoggedIn.balance = userLoggedIn.balance - Number(input[2])
+        userLoggedIn.balance = userLoggedIn.balance - amount
         // print output
         console.log(
           `Transferred ${input[2]} to ${input[1]}, your balance is $${userLoggedIn.balance}`
