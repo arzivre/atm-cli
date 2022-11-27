@@ -26,5 +26,5 @@ unit['cli login should return a fail test'] = function (done) {
   assert.equal(cli.output, 'Hallo sony!')
   done()
 }
-
+  
 export default unit

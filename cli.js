@@ -82,23 +82,22 @@ cli.responders.login = async function (str) {
 
     if (user) {
       // found User
-      userLoggedIn = user
       const checkPassword = input[2] === user.password
       if (checkPassword) {
-        cli.output = `Hallo ${user.name}! Your balance is $ ${user.balance}`
+        userLoggedIn = user
+        cli.output = `Hallo ${userLoggedIn.name}! Your balance is $ ${userLoggedIn.balance}`
         console.log(cli.output)
       } else {
         console.log('Invalid Username or Password')
       }
     } else {
       // User not found and Create new User
-      const createdUser = await prisma.user.create({
+      userLoggedIn = await prisma.user.create({
         data: {
           name: input[1],
           password: input[2],
         },
       })
-      userLoggedIn = createdUser
       cli.output = `Hallo ${userLoggedIn.name}! Your balance is $ ${userLoggedIn.balance}`
       console.log(cli.output)
     }
@@ -123,7 +122,7 @@ cli.responders.deposit = async function (str) {
       console.log('Amount is required')
     }
   } else {
-    const user = await prisma.user.update({
+    userLoggedIn = await prisma.user.update({
       where: {
         id: userLoggedIn.id,
       },
@@ -131,14 +130,42 @@ cli.responders.deposit = async function (str) {
         balance: userLoggedIn.balance + Number(input[1]),
       },
     })
-    userLoggedIn = user
     console.log(`Your balance is $${userLoggedIn.balance}`)
   }
   clearScreen()
 }
 
-cli.responders.withdraw = function () {
-  console.log('You asked for withdraw')
+cli.responders.withdraw = async function (str) {
+  const input = str.split(' ')
+  // Input Validation
+  if (
+    input[1] === undefined ||
+    userLoggedIn.id === undefined ||
+    isNaN(parseInt(input[1])) ||
+    Math.sign(userLoggedIn.balance - Number(input[1])) === -1
+  ) {
+    // Print action errors
+    if (userLoggedIn.id === undefined) {
+      console.log('You need to login first')
+    } else if (isNaN(parseInt(input[1]))) {
+      console.log('Please input amount in number')
+    } else if (Math.sign(userLoggedIn.balance - Number(input[1])) === -1) {
+      console.log('Withdrawl limit exceeded, Please lower amount withdrawal')
+    } else {
+      console.log('Amount is required')
+    }
+  } else {
+    userLoggedIn = await prisma.user.update({
+      where: {
+        id: userLoggedIn.id,
+      },
+      data: {
+        balance: userLoggedIn.balance - Number(input[1]),
+      },
+    })
+    console.log(`Your balance is $${userLoggedIn.balance}`)
+  }
+  clearScreen()
 }
 
 cli.responders.transfer = function () {
