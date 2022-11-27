@@ -78,14 +78,31 @@ cli.responders.login = async function (str) {
       where: {
         name: input[1],
       },
+      include: {
+        debt: true,
+        creditor: true,
+      },
     })
-
     if (user) {
       // found User
       const checkPassword = input[2] === user.password
       if (checkPassword) {
         userLoggedIn = user
-        cli.output = `Hallo ${userLoggedIn.name}! Your balance is $ ${userLoggedIn.balance}`
+        userLoggedIn.totaldebt = user.debt.reduce(
+          (acc, data) => acc + parseInt(data.value),
+          0
+        )
+        userLoggedIn.totalcreditor = user.creditor.reduce(
+          (acc, data) => acc + parseInt(data.value),
+          0
+        )
+        // total balance
+        userLoggedIn.balance =
+          user.balance + userLoggedIn.totalcreditor - userLoggedIn.totaldebt
+
+        cli.output = `Hallo ${userLoggedIn.name}! Your balance is $ ${
+          Math.sign(userLoggedIn.balance) === -1 ? '0' : userLoggedIn.balance
+        }, you owe ${user.debt[0].value} to ${user.debt[0].creditor}`
         console.log(cli.output)
       } else {
         console.log('Invalid Username or Password')
@@ -109,8 +126,8 @@ cli.responders.deposit = async function (str) {
   const input = str.split(' ')
   // Input Validation
   if (
-    input[1] === undefined ||
     userLoggedIn.id === undefined ||
+    input[1] === undefined ||
     isNaN(parseInt(input[1]))
   ) {
     // Print action errors
@@ -122,15 +139,96 @@ cli.responders.deposit = async function (str) {
       console.log('Amount is required')
     }
   } else {
-    userLoggedIn = await prisma.user.update({
-      where: {
-        id: userLoggedIn.id,
-      },
-      data: {
-        balance: userLoggedIn.balance + Number(input[1]),
-      },
-    })
-    console.log(`Your balance is $${userLoggedIn.balance}`)
+    //* Automatically transfer deposit to pay the first debt if have debt
+    if (userLoggedIn.totaldebt > 0) {
+      const target = await prisma.user.findUnique({
+        where: {
+          name: userLoggedIn.debt[1].creditor,
+        },
+      })
+
+      //* if deposite more than enought to pay debt save the return
+      if (input[1] - userLoggedIn.debt[0].value > 0) {
+        // increase user balance added from return value
+        userLoggedIn = await prisma.user.update({
+          where: {
+            id: userLoggedIn.id,
+          },
+          data: {
+            balance: Number(input[1]) - Number(userLoggedIn.debt[0].value),
+          },
+        })
+
+        // increase target balance
+        await prisma.user.update({
+          where: {
+            id: target.id,
+          },
+          data: {
+            balance: target.balance + Number(userLoggedIn.debt[0].value),
+            creditor: {
+              update: {
+                where: {
+                  debtor: userLoggedIn.name,
+                },
+                data: {
+                  isPaid: true,
+                },
+              },
+            },
+          },
+        })
+        // delete user debt
+        await prisma.creditor.delete({
+          where: {
+            id: userLoggedIn.debt[0].id,
+          },
+        })
+
+        console.log(
+          `Transferred to ${target.name}, your balance is $${userLoggedIn.balance}`
+        )
+      } else {
+        // increase target balance
+        await prisma.user.update({
+          where: {
+            id: target.id,
+          },
+          data: {
+            balance:
+              Number(target.balance) + Number(userLoggedIn.debt[0].value),
+            creditor: {
+              update: {
+                where: {
+                  debtor: userLoggedIn.name,
+                },
+                data: {
+                  value: Number(userLoggedIn.debt[0].value) - Number(input[1]),
+                },
+              },
+            },
+          },
+        })
+        console.log(
+          `Transferred to ${target.name}, your balance is $${
+            userLoggedIn.balance
+          }, you owe ${userLoggedIn.debt[0].value - Number(input[1])} to ${
+            target.name
+          }`
+        )
+      }
+    } else {
+      //* user doesnt have debt
+      userLoggedIn = await prisma.user.update({
+        where: {
+          id: userLoggedIn.id,
+        },
+        data: {
+          balance: userLoggedIn.balance + Number(input[1]),
+        },
+      })
+      console.log(`Your balance is $${userLoggedIn.balance}`)
+    }
   }
   clearScreen()
 }
@@ -150,7 +248,7 @@ cli.responders.withdraw = async function (str) {
     } else if (isNaN(parseInt(input[1]))) {
       console.log('Please input amount in number')
     } else if (Math.sign(userLoggedIn.balance - Number(input[1])) === -1) {
-      console.log('Withdrawl limit exceeded, Please lower amount withdrawal')
+      console.log('Please reduce amount, amount exceeded the balance')
     } else {
       console.log('Amount is required')
     }
@@ -163,13 +261,125 @@ cli.responders.withdraw = async function (str) {
         balance: userLoggedIn.balance - Number(input[1]),
       },
     })
-    console.log(`Your balance is $${userLoggedIn.balance}`)
+    console.log(`Withdraw success, your balance is $${userLoggedIn.balance}`)
   }
   clearScreen()
 }
 
-cli.responders.transfer = function () {
-  console.log('You asked for transfer')
+cli.responders.transfer = async function (str) {
+  const input = str.split(' ')
+
+  // Input Validation
+  if (
+    userLoggedIn.id === undefined ||
+    input[1] === undefined ||
+    input[2] === undefined ||
+    isNaN(parseInt(input[2]))
+  ) {
+    // Print action errors
+    if (userLoggedIn.id === undefined) {
+      console.log('You need to login first')
+    } else if (input[1] === undefined) {
+      console.log('Please Target is required')
+    } else if (isNaN(parseInt(input[2]))) {
+      console.log('Please input amount in number')
+    } else {
+      console.log('Amount is required')
+    }
+  } else {
+    // get target data
+    const target = await prisma.user.findUnique({
+      where: {
+        name: input[1],
+      },
+    })
+    // check if target is on database
+    if (target === null) {
+      console.log('Trarget is not registered')
+    } else {
+      //** user balance is not enough will generate debt */
+      if (Math.sign(userLoggedIn.balance - Number(input[2])) === -1) {
+        const debtValue = Math.abs(userLoggedIn.balance - Number(input[2]))
+        // get target data
+        // Decrease user balance and generate debt
+        const updateUser = prisma.user.update({
+          where: {
+            id: userLoggedIn.id,
+          },
+          data: {
+            balance: 0,
+            debt: {
+              create: {
+                isPaid: false,
+                debtor: userLoggedIn.name,
+                value: debtValue,
+                creditor: target.name,
+              },
+            },
+          },
+          include: { debt: true, creditor: true },
+        })
+
+        // increase target balance and generate creditor
+        const updateTarget = prisma.user.update({
+          where: {
+            id: target.id,
+          },
+          data: {
+            balance: userLoggedIn.balance + Number(input[2]),
+            creditor: {
+              create: {
+                isPaid: false,
+                debtor: userLoggedIn.name,
+                value: debtValue,
+                creditor: target.name,
+              },
+            },
+          },
+          include: { debt: true, creditor: true },
+        })
+
+        // if there is any fail transaction, will cancel all transaction
+        await prisma.$transaction([updateUser, updateTarget])
+
+        console.log(
+          `Transferred ${input[2]} to ${input[1]}, your balance is $ 0, Owed ${debtValue} to ${input[1]}`
+        )
+      } else {
+        //** user balance is enough, doesn't generate debt */
+
+        // Decrease user balance
+        const updateUser = prisma.user.update({
+          where: {
+            id: userLoggedIn.id,
+          },
+          data: {
+            balance: userLoggedIn.balance - Number(input[2]),
+          },
+        })
+
+        // increase target balance
+        const updateTarget = prisma.user.update({
+          where: {
+            id: target.id,
+          },
+          data: {
+            balance: userLoggedIn.balance + Number(input[2]),
+          },
+        })
+
+        // if there is any fail transaction, will cancel all transaction
+        await prisma.$transaction([updateUser, updateTarget])
+        // update user balance
+        userLoggedIn.balance = userLoggedIn.balance - Number(input[2])
+        // print output
+        console.log(
+          `Transferred ${input[2]} to ${input[1]}, your balance is $${userLoggedIn.balance}`
+        )
+      }
+    }
+  }
+  clearScreen()
 }
 
 cli.responders.logout = function () {
@@ -186,6 +396,8 @@ cli.responders.exit = function () {
 //! Delete later
 cli.responders.test = async function (str) {
   const input = str.split(' ')
+  const debtValue = Math.abs(userLoggedIn.balance - Number(input[1]))
+  console.log(debtValue)
   clearScreen()
 }
 
