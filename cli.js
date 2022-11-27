@@ -1,18 +1,16 @@
 #!/usr/bin/env node
 
 import { createInterface } from 'readline'
-import { debuglog } from 'util'
 import events from 'events'
 import { PrismaClient, Prisma } from '@prisma/client'
 
 const prisma = new PrismaClient()
-const debug = debuglog('cli')
 class _events extends events {}
 const e = new _events()
 
 // Instantiate the cli module object
 const cli = {}
-
+// Instantiate User state
 let userLoggedIn = {}
 
 // Input handlers
@@ -51,6 +49,7 @@ e.on('test', function (str) {
 
 //** Responders object */
 cli.responders = {}
+cli.output = ''
 
 // Help
 cli.responders.help = function (str) {
@@ -70,6 +69,7 @@ cli.responders.help = function (str) {
 
 cli.responders.login = async function (str) {
   const input = str.split(' ')
+
   // Input Validation
   if (input[1] === undefined || input[2] === undefined) {
     console.log('username and password is required')
@@ -85,7 +85,8 @@ cli.responders.login = async function (str) {
       userLoggedIn = user
       const checkPassword = input[2] === user.password
       if (checkPassword) {
-        console.log(`Hallo ${user.name}! Your balance is $ ${user.balance}`)
+        cli.output = `Hallo ${user.name}! Your balance is $ ${user.balance}`
+        console.log(cli.output)
       } else {
         console.log('Invalid Username or Password')
       }
@@ -98,9 +99,8 @@ cli.responders.login = async function (str) {
         },
       })
       userLoggedIn = createdUser
-      console.log(
-        `Hallo ${userLoggedIn.name}! Your balance is $ ${userLoggedIn.balance}`
-      )
+      cli.output = `Hallo ${userLoggedIn.name}! Your balance is $ ${userLoggedIn.balance}`
+      console.log(cli.output)
     }
   }
   clearScreen()
@@ -114,6 +114,7 @@ cli.responders.deposit = async function (str) {
     userLoggedIn.id === undefined ||
     isNaN(parseInt(input[1]))
   ) {
+    // Print action errors
     if (userLoggedIn.id === undefined) {
       console.log('You need to login first')
     } else if (isNaN(parseInt(input[1]))) {
@@ -155,13 +156,13 @@ cli.responders.exit = function () {
   console.log('exit')
   process.exit(0)
 }
-
+//! Delete later
 cli.responders.test = async function (str) {
   const input = str.split(' ')
   clearScreen()
 }
 
-const clearScreen = function () {
+const clearScreen = () => {
   process.stdout.write('ATM->')
 }
 
