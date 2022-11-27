@@ -124,6 +124,7 @@ cli.responders.login = async function (str) {
 
 cli.responders.deposit = async function (str) {
   const input = str.split(' ')
+  const amount = Number(input[1])
   // Input Validation
   if (
     userLoggedIn.id === undefined ||
@@ -143,19 +144,19 @@ cli.responders.deposit = async function (str) {
     if (userLoggedIn.totaldebt > 0) {
       const target = await prisma.user.findUnique({
         where: {
-          name: userLoggedIn.debt[1].creditor,
+          name: userLoggedIn.debt[0].creditor,
         },
       })
 
       //* if deposite more than enought to pay debt save the return
-      if (input[1] - userLoggedIn.debt[0].value > 0) {
+      if (amount - userLoggedIn.debt[0].value > 0) {
         // increase user balance added from return value
         userLoggedIn = await prisma.user.update({
           where: {
             id: userLoggedIn.id,
           },
           data: {
-            balance: Number(input[1]) - Number(userLoggedIn.debt[0].value),
+            balance: amount - Number(userLoggedIn.debt[0].value),
           },
         })
 
@@ -166,20 +167,22 @@ cli.responders.deposit = async function (str) {
           },
           data: {
             balance: target.balance + Number(userLoggedIn.debt[0].value),
-            creditor: {
-              update: {
-                where: {
-                  debtor: userLoggedIn.name,
-                },
-                data: {
-                  isPaid: true,
-                },
-              },
-            },
+          },
+        })
+        // delete targe creditor
+        const creditor = await prisma.creditor.findUnique({
+          where: {
+            debtor: userLoggedIn.name,
+          },
+        })
+        // delete targe creditor
+        await prisma.creditor.delete({
+          where: {
+            id: creditor.id,
           },
         })
         // delete user debt
-        await prisma.creditor.delete({
+        await prisma.debt.delete({
           where: {
             id: userLoggedIn.debt[0].id,
           },
@@ -197,24 +200,39 @@ cli.responders.deposit = async function (str) {
           data: {
             balance:
               Number(target.balance) + Number(userLoggedIn.debt[0].value),
-            creditor: {
-              update: {
-                where: {
-                  debtor: userLoggedIn.name,
-                },
-                data: {
-                  value: Number(userLoggedIn.debt[0].value) - Number(input[1]),
-                },
-              },
-            },
           },
         })
+
+        const creditor = await prisma.creditor.findUnique({
+          where: {
+            debtor: userLoggedIn.name,
+          },
+        })
+
+        // reduce creditor value
+        await prisma.creditor.update({
+          where: {
+            debtor: userLoggedIn.name,
+          },
+          data: {
+            value: Number(userLoggedIn.debt[0].value) - amount,
+          },
+        })
+
+        // reduce debt value
+        await prisma.debt.update({
+          where: {
+            id: userLoggedIn.debt[0].id,
+          },
+          data: {
+            value: userLoggedIn.debt[0].value - amount,
+          },
+        })
+
         console.log(
           `Transferred to ${target.name}, your balance is $${
             userLoggedIn.balance
-          }, you owe ${userLoggedIn.debt[0].value - Number(input[1])} to ${
-            target.name
-          }`
+          }, you owe ${userLoggedIn.debt[0].value - amount} to ${target.name}`
         )
       }
     } else {
@@ -224,7 +242,7 @@ cli.responders.deposit = async function (str) {
           id: userLoggedIn.id,
         },
         data: {
-          balance: userLoggedIn.balance + Number(input[1]),
+          balance: userLoggedIn.balance + amount,
         },
       })
       console.log(`Your balance is $${userLoggedIn.balance}`)
@@ -235,19 +253,20 @@ cli.responders.deposit = async function (str) {
 
 cli.responders.withdraw = async function (str) {
   const input = str.split(' ')
+  const amount = Number(input[1])
   // Input Validation
   if (
     input[1] === undefined ||
     userLoggedIn.id === undefined ||
     isNaN(parseInt(input[1])) ||
-    Math.sign(userLoggedIn.balance - Number(input[1])) === -1
+    Math.sign(userLoggedIn.balance - amount) === -1
   ) {
     // Print action errors
     if (userLoggedIn.id === undefined) {
       console.log('You need to login first')
     } else if (isNaN(parseInt(input[1]))) {
       console.log('Please input amount in number')
-    } else if (Math.sign(userLoggedIn.balance - Number(input[1])) === -1) {
+    } else if (Math.sign(userLoggedIn.balance - amount) === -1) {
       console.log('Please reduce amount, amount exceeded the balance')
     } else {
       console.log('Amount is required')
@@ -258,7 +277,7 @@ cli.responders.withdraw = async function (str) {
         id: userLoggedIn.id,
       },
       data: {
-        balance: userLoggedIn.balance - Number(input[1]),
+        balance: userLoggedIn.balance - amount,
       },
     })
     console.log(`Withdraw success, your balance is $${userLoggedIn.balance}`)

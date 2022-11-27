@@ -35,7 +35,7 @@ model Debt {
   isPaid   Boolean @default(false)
   debtor   String
   value    Int
-  creditor String
+  creditor String  @unique
   User     User?   @relation(fields: [userId], references: [id])
 }
 
@@ -43,7 +43,7 @@ model Creditor {
   id       String  @id @default(cuid())
   userId   String?
   isPaid   Boolean @default(false)
-  debtor   String
+  debtor   String  @unique
   value    Int
   creditor String
   User     User?   @relation(fields: [userId], references: [id])

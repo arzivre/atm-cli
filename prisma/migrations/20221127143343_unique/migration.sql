@@ -3,7 +3,7 @@ CREATE TABLE "User" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "name" TEXT NOT NULL,
     "password" TEXT NOT NULL,
-    "balance" INTEGER
+    "balance" INTEGER NOT NULL DEFAULT 0
 );
 
 -- CreateTable
@@ -40,3 +40,9 @@ CREATE TABLE "Creditor" (
 
 -- CreateIndex
 CREATE UNIQUE INDEX "User_name_key" ON "User"("name");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Debt_creditor_key" ON "Debt"("creditor");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Creditor_creditor_key" ON "Creditor"("creditor");
