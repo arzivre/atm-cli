@@ -17,7 +17,6 @@ model User {
   balance     Int           @default(0)
   transaction Transaction[]
   debt        Debt[]
-  creditor    Creditor[]
 }
 
 model Transaction {
@@ -39,12 +38,3 @@ model Debt {
   User     User?   @relation(fields: [userId], references: [id])
 }
 
-model Creditor {
-  id       String  @id @default(cuid())
-  userId   String?
-  isPaid   Boolean @default(false)
-  debtor   String  @unique
-  value    Int
-  creditor String
-  User     User?   @relation(fields: [userId], references: [id])
-}
