@@ -19,7 +19,12 @@ e.on('help', function (str) {
 })
 
 e.on('login', function (str) {
-  cli.responders.login(str)
+  if (userLoggedIn.id === undefined) {
+    cli.responders.login(str)
+  } else {
+    console.log('You need to logout then login again')
+    clearScreen()
+  }
 })
 
 e.on('deposit', function (str) {
@@ -301,7 +306,8 @@ cli.responders.transfer = async function (str) {
     userLoggedIn.id === undefined ||
     input[1] === undefined ||
     input[2] === undefined ||
-    isNaN(parseInt(input[2]))
+    isNaN(parseInt(input[2])) ||
+    targetName === userLoggedIn.name
   ) {
     // Print action errors
     if (userLoggedIn.id === undefined) {
@@ -310,6 +316,8 @@ cli.responders.transfer = async function (str) {
       console.log('Please Target is required')
     } else if (isNaN(parseInt(input[2]))) {
       console.log('Please input amount in number')
+    } else if (targetName === userLoggedIn.name) {
+      console.log('You cant  transfer to yourself')
     } else {
       console.log('Amount is required')
     }
